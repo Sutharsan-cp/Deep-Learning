@@ -1,0 +1,17 @@
+Part 1: Compare different activation functions on small random data
+Goal: Generate 100 random values in range [-5, 5] and observe how different common activation functions behave.
+Common activation functions to compare:
+
+Sigmoid
+Tanh
+ReLU
+Leaky ReLU (α = 0.1)
+ELU (α = 1.0)
+
+Quick observations:
+
+Sigmoid → compresses everything to (0,1), strong saturation
+Tanh → compresses to (-1,1), zero-centered, still saturates
+ReLU → kills all negative values (most common in deep nets)
+Leaky ReLU → small negative slope → helps avoid dying ReLU problem
+ELU → smooth negative part, can push mean closer to zero
