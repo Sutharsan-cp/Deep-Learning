@@ -1,38 +1,78 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 import numpy as np
-import matplotlib.pyplot as plt
 
-# Generate data
-np.random.seed(42)
-x = np.random.uniform(-5, 5, 100)
-x = np.sort(x)  # for nicer plotting
+# -----------------------------
+# Load dataset (example: Skin_NonSkin.txt)
+# -----------------------------
+data = np.loadtxt("Skin_NonSkin.txt")   # columns: B, G, R, label
+X = data[:, :3]   # features
+y = data[:, 3]    # labels (1=skin, 2=nonskin)
 
-# Activation functions
-def sigmoid(z):    return 1 / (1 + np.exp(-z))
-def tanh(z):       return np.tanh(z)
-def relu(z):       return np.maximum(0, z)
-def leaky_relu(z, alpha=0.1): return np.where(z > 0, z, alpha * z)
-def elu(z, alpha=1.0): return np.where(z > 0, z, alpha * (np.exp(z) - 1))
+# Convert labels to 0/1
+y = (y == 1).astype(int)
 
-# Compute outputs
-y_sigmoid   = sigmoid(x)
-y_tanh      = tanh(x)
-y_relu      = relu(x)
-y_leakyrelu = leaky_relu(x)
-y_elu       = elu(x)
+# Normalize features
+scaler = StandardScaler()
+X = scaler.fit_transform(X)
 
-# Plot
-plt.figure(figsize=(12, 7))
-plt.plot(x, y_sigmoid,   label='Sigmoid', linewidth=2)
-plt.plot(x, y_tanh,      label='Tanh', linewidth=2)
-plt.plot(x, y_relu,      label='ReLU', linewidth=2)
-plt.plot(x, y_leakyrelu, label='Leaky ReLU (α=0.1)', linewidth=2)
-plt.plot(x, y_elu,       label='ELU (α=1)', linewidth=2)
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-plt.axhline(0, color='gray', linestyle='--', alpha=0.4)
-plt.axvline(0, color='gray', linestyle='--', alpha=0.4)
-plt.title("Comparison of Activation Functions (-5 to 5)", fontsize=14)
-plt.xlabel("Input value")
-plt.ylabel("Output")
-plt.legend()
-plt.grid(True, alpha=0.3)
-plt.show()
+# Convert to tensors
+X_train = torch.tensor(X_train, dtype=torch.float32)
+y_train = torch.tensor(y_train, dtype=torch.float32).view(-1, 1)
+X_test = torch.tensor(X_test, dtype=torch.float32)
+y_test = torch.tensor(y_test, dtype=torch.float32).view(-1, 1)
+
+# -----------------------------
+# Define Neural Network
+# -----------------------------
+class SkinNN(nn.Module):
+    def __init__(self):
+        super(SkinNN, self).__init__()
+        self.fc1 = nn.Linear(3, 16)   # input 3 → hidden 16
+        self.fc2 = nn.Linear(16, 8)   # hidden 16 → hidden 8
+        self.fc3 = nn.Linear(8, 1)    # output 1
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+        
+    def forward(self, x):
+        x = self.relu(self.fc1(x))
+        x = self.relu(self.fc2(x))
+        x = self.sigmoid(self.fc3(x))
+        return x
+
+model = SkinNN()
+
+# -----------------------------
+# Loss and Optimizer
+# -----------------------------
+criterion = nn.BCELoss()  # binary cross entropy
+optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+
+# -----------------------------
+# Training Loop
+# -----------------------------
+epochs = 2000
+for epoch in range(epochs):
+    optimizer.zero_grad()
+    outputs = model(X_train)
+    loss = criterion(outputs, y_train)
+    loss.backward()
+    optimizer.step()
+    
+    if (epoch+1) % 5 == 0:
+        print(f"Epoch {epoch+1}/{epochs}, Loss: {loss.item():.4f}")
+
+# -----------------------------
+# Evaluation
+# -----------------------------
+with torch.no_grad():
+    y_pred = model(X_test)
+    y_pred_cls = (y_pred > 0.5).float()
+    acc = (y_pred_cls.eq(y_test).sum() / y_test.shape[0]).item()
+    print(f"Test Accuracy: {acc:.4f}")
